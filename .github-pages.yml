@@ -1,0 +1,2 @@
+# GitHub Pages deployment is prepared via .github/workflows/deploy-pages.yml.
+# Enable Pages in repository settings and select GitHub Actions.

@@ -170,6 +170,14 @@ button{font-family:inherit;}
 .admin-bar{flex:1;background:linear-gradient(180deg,#37b7d8,#0e3a5c);border-radius:7px 7px 2px 2px;min-height:16px;position:relative;}
 .admin-bar span{position:absolute;bottom:-20px;right:0;left:0;text-align:center;font-size:9px;color:#8aa0ae;}
 @media(max-width:850px){.admin-shell{padding:20px 15px}.admin-layout{grid-template-columns:1fr}.admin-sidebar{min-height:auto;display:flex;flex-wrap:wrap;gap:4px;padding:10px}.admin-side-brand{width:100%;margin:0;padding:6px 8px 12px}.admin-tab{width:auto;flex:1;min-width:100px;text-align:center}.admin-stat-grid{grid-template-columns:repeat(2,1fr)}.admin-chart{grid-template-columns:1fr}}
+.admin-product-img img,.pcard-img img,.offer-img img,.newcard .img img,.pd-hero img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;}
+.admin-product-img.has-photo{background:#eef5f8!important;}
+.admin-stock{font-size:10px;color:#718698;margin-top:3px;}
+.admin-stock.low{color:#d46725;font-weight:800;}
+.admin-select{border:1px solid #dce7ed;border-radius:8px;padding:6px 8px;background:#fff;font:inherit;font-size:11px;color:#29475a;}
+.admin-settings-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
+.admin-note{background:#f2f8fb;border:1px solid #dbeef4;color:#557083;border-radius:12px;padding:11px;font-size:11px;line-height:1.7;margin-top:14px;}
+
 
 /* ===== Header ===== */
 .app-header{
@@ -917,7 +925,7 @@ let PRODUCTS = [];
 let OFFERS = [];
 let NEW_ARRIVALS = [];
 let productSeq = 1;
-const ORDERS = [
+let ORDERS = [
   {id:'#MJ-58211', date:'٢٠ أيلول ٢٠٢٦', total:412.5, status:'transit', statusLabel:'قيد التوصيل'},
   {id:'#MJ-58177', date:'١٧ أيلول ٢٠٢٦', total:298.0, status:'done', statusLabel:'مكتمل'},
   {id:'#MJ-58122', date:'١٢ أيلول ٢٠٢٦', total:654.75, status:'done', statusLabel:'مكتمل'},
@@ -931,9 +939,52 @@ const state = {
   stack: ['home'],
 };
 const productById = id => PRODUCTS.find(p=>p.id===id) || OFFERS.find(p=>p.id===id);
-
+/* ======================= Local store + production bridge ======================= */
+const STORE_KEY = 'mujammadatco_store_v2';
+let currentAdminRole = 'manager';
+let pendingProductImage = '';
+function defaultProducts(){
+  const defs=[
+    ['p101','فروج كامل مجمد 1000غ','1000 غ','نبيل',3.25,'poultry',12],
+    ['p102','بطاطا أصابع مجمدة 2.5كغ','2.5 كغ','الوادي',4.75,'veg',24],
+    ['p103','فيليه سمك أبيض 1كغ','1 كغ','أمريكانا',6.50,'fish',8],
+    ['p104','برغر لحم 20 قطعة','20 قطعة','سنيورة',5.90,'seniora',16],
+    ['p105','بازلاء وجزر 450غ','450 غ','مجمداتكو',1.85,'veg',42],
+    ['p106','جبنة موزاريلا 2كغ','2 كغ','المزرعاوي',9.90,'cheese',5]
+  ];
+  return defs.map(([id,name,weight,brand,price,cat,stock])=>{const c=CAT_MAP[cat]; const x=prod(id,name,weight,brand,price,null,cat,c.grad,c.icon,null,'كرتونة'); x.stock=stock; return x;});
+}
+function saveStore(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify({products:PRODUCTS,offers:OFFERS,newArrivals:NEW_ARRIVALS,orders:ORDERS,productSeq,banners:BANNERS,settings:window.storeSettings||{}})); }catch(e){ console.warn('saveStore failed',e); }
+}
+function hydrateStore(){
+  try{
+    const raw=localStorage.getItem(STORE_KEY); const d=raw?JSON.parse(raw):null;
+    if(d && Array.isArray(d.products)){ PRODUCTS=d.products; OFFERS=d.offers||[]; NEW_ARRIVALS=d.newArrivals||[]; if(Array.isArray(d.orders)) ORDERS=d.orders; productSeq=d.productSeq||PRODUCTS.length+1; if(Array.isArray(d.banners)) BANNERS=d.banners; window.storeSettings=d.settings||{}; }
+    else { PRODUCTS=defaultProducts(); OFFERS=PRODUCTS.slice(0,3).map(x=>({...x,old:x.price+1.2,discount:15})); NEW_ARRIVALS=PRODUCTS.slice(3,5); productSeq=107; saveStore(); }
+  }catch(e){ PRODUCTS=defaultProducts(); OFFERS=PRODUCTS.slice(0,3); productSeq=107; }
+}
+function requestBrowserNotification(title,body){
+  if('Notification' in window && Notification.permission==='granted') new Notification(title,{body,icon:'assets/app-icon.svg'});
+}
+function notifyOrder(message){ requestBrowserNotification('مجمداتكو — تحديث الطلب',message); try{ localStorage.setItem('mujammadatco_last_notification',JSON.stringify({message,at:Date.now()})); }catch(e){} }
+function createOrderFromCart(){
+  const total=cartTotal()+1.5; const id='#MJ-'+Math.floor(10000+Math.random()*89999);
+  ORDERS.unshift({id,date:new Intl.DateTimeFormat('ar-JO',{day:'numeric',month:'long',year:'numeric'}).format(new Date()),total,status:'prep',statusLabel:'قيد التجهيز'});
+  Object.entries(state.cart).forEach(([id,q])=>{const p=productById(id);if(p&&typeof p.stock==='number')p.stock=Math.max(0,p.stock-q);});
+  saveStore(); notifyOrder(`تم استلام الطلب ${id} بقيمة ${total.toFixed(2)} د.أ`); return id;
+}
+function productVisual(p,size){ if(p&&p.image) return `<img src="${p.image}" alt="${p.name||''}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:12px;">`; return sticker(p?.cat||'poultry',size); }
+function exportStoreReport(){
+  const rows=[['رقم الطلب','التاريخ','الإجمالي','الحالة'],...ORDERS.map(o=>[o.id,o.date,o.total.toFixed(2),o.statusLabel])];
+  const csv='\\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='mujammadatco-orders-report.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);showToast('تم تصدير تقرير الطلبات ✓');
+}
+function downloadBackup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([localStorage.getItem(STORE_KEY)||'{}'],{type:'application/json'}));a.download='mujammadatco-backup.json';a.click();showToast('تم تنزيل النسخة الاحتياطية ✓');}
+function restoreBackup(file){const r=new FileReader();r.onload=()=>{try{localStorage.setItem(STORE_KEY,r.result);location.reload();}catch(e){showToast('ملف النسخة الاحتياطية غير صالح');}};r.readAsText(file);}
 /* ======================= لوحة الإعلانات (Firebase + imgbb) ======================= */
 let BANNERS = []; // {id, url, createdAt}
+hydrateStore();
 async function loadBanners(){
   if(!firebaseReady) return;
   try{
@@ -954,7 +1005,7 @@ async function uploadBannerImage(file){
     await db.collection('banners').add({url, createdAt: Date.now()});
     await loadBanners();
   } else {
-    BANNERS.unshift({id:'local-'+Date.now(), url});
+    BANNERS.unshift({id:'local-'+Date.now(), url}); saveStore();
   }
 }
 async function deleteBannerImage(id){
@@ -1016,7 +1067,7 @@ function renderHome(){
     <div class="offer-card">
       <div class="offer-img" style="background:linear-gradient(${p.grad})" data-open-product="${p.id}">
         ${p.discount?`<span class="offer-badge">خصم ${p.discount}%</span>`:''}
-        ${sticker(p.cat,58)}
+        ${productVisual(p,58)}
       </div>
       <div class="offer-name" data-open-product="${p.id}">${p.name}</div>
       <span class="offer-unit">${p.unit}</span>
@@ -1030,7 +1081,7 @@ function renderHome(){
   const arrivals = NEW_ARRIVALS.map(p=>`
     <div class="newcard" data-open-product="${p.id}">
       <div class="img" style="background:linear-gradient(${p.grad})">
-        ${sticker(p.cat,58)}
+        ${productVisual(p,58)}
       </div>
       <span class="newtag">جديد</span>
       <div class="nm">${p.name}</div>
@@ -1118,7 +1169,7 @@ function renderCategory(catId){
     <div class="pcard">
       <div class="pcard-img" style="background:linear-gradient(${p.grad})" data-open-product="${p.id}">
         ${p.discount?`<span class="pcard-discount">خصم ${p.discount}%</span>`:''}
-        ${sticker(p.cat,58)}
+        ${productVisual(p,58)}
       </div>
       <div class="pcard-body">
         <div class="pcard-name" data-open-product="${p.id}">${p.name}</div>
@@ -1169,7 +1220,7 @@ function renderProduct(id){
   return `
   <div class="pd-hero" style="background:linear-gradient(${p.grad})">
     <button class="back-btn" data-nav-back>${I.back}</button>
-    ${sticker(p.cat,150)}
+    ${productVisual(p,150)}
   </div>
   <div class="pd-sheet">
     <div class="pd-brand">${p.brand}</div>
@@ -1381,22 +1432,22 @@ function renderAdmin(){
   const totalSales = ORDERS.reduce((s,o)=>s+o.total,0);
   const catOptions = CATS.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   const productRows = PRODUCTS.map(p=>`<tr>
-    <td><div class="admin-product"><div class="admin-product-img" style="background:linear-gradient(${p.grad})">${sticker(p.cat,30)}</div><div><b>${p.name}</b><small>${p.brand} · ${p.weight||'—'}</small></div></div></td>
-    <td>${CAT_MAP[p.cat]?CAT_MAP[p.cat].name:'—'}</td><td><b>${p.price.toFixed(2)} د.أ</b></td><td><span class="admin-badge ${p.discount?'orange':'green'}">${p.discount?'عرض':'متاح'}</span></td>
+    <td><div class="admin-product"><div class="admin-product-img ${p.image?'has-photo':''}" style="background:linear-gradient(${p.grad})">${productVisual(p,38)}</div><div><b>${p.name}</b><small>${p.brand} · ${p.weight||'—'}</small></div></div></td>
+    <td>${CAT_MAP[p.cat]?CAT_MAP[p.cat].name:'—'}</td><td><b>${p.price.toFixed(2)} د.أ</b><div class="admin-stock ${typeof p.stock==='number'&&p.stock<10?'low':''}">المخزون: ${typeof p.stock==='number'?p.stock:'غير محدد'}</div></td><td><span class="admin-badge ${p.discount?'orange':'green'}">${p.discount?'عرض':'متاح'}</span></td>
     <td><div class="admin-row-actions"><button class="admin-icon-btn" title="تعديل" data-edit-product="${p.id}">تعديل</button><button class="admin-icon-btn" title="حذف" data-del-product="${p.id}">حذف</button></div></td></tr>`).join('');
   const orderRows = ORDERS.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.date}</td><td>${o.total.toFixed(2)} د.أ</td><td><select class="admin-status-select" data-order-status="${o.id}"><option ${o.status==='prep'?'selected':''} value="prep">قيد التجهيز</option><option ${o.status==='transit'?'selected':''} value="transit">قيد التوصيل</option><option ${o.status==='done'?'selected':''} value="done">مكتمل</option></select></td><td><button class="admin-icon-btn" data-view-order="${o.id}">عرض</button></td></tr>`).join('');
   const categoryRows = CATS.map(c=>`<tr><td><div class="admin-product"><div class="admin-product-img" style="background:linear-gradient(${c.grad})">${sticker(c.id,28)}</div><b>${c.name}</b></div></td><td>${catCount(c.id)}</td><td><span class="admin-badge blue">نشط</span></td><td><div class="admin-row-actions"><button class="admin-icon-btn">تعديل</button><button class="admin-icon-btn">حذف</button></div></td></tr>`).join('');
   return `<div class="admin-shell">
     <div class="admin-topbar"><div><div class="admin-kicker">مجمداتكو للتوريد · مركز العمليات</div><h1 class="admin-title">لوحة التحكم</h1></div><div class="admin-top-actions"><button class="admin-btn ghost" id="adminStorePreview">معاينة المتجر</button><div class="admin-user"><div class="admin-avatar">م</div><span>مدير المتجر<br><small style="color:#8aa0ae">آخر دخول اليوم</small></span></div></div></div>
-    <div class="admin-layout"><aside class="admin-sidebar"><div class="admin-side-brand"><div class="brand-mark">${I.brandmark}</div><div><b>مجمداتكو</b><small>إدارة المتجر</small></div></div><button class="admin-tab active" data-admin-tab="overview">نظرة عامة</button><button class="admin-tab" data-admin-tab="products">المنتجات</button><button class="admin-tab" data-admin-tab="categories">الأقسام</button><button class="admin-tab" data-admin-tab="orders">الطلبات</button><button class="admin-tab" data-admin-tab="marketing">الإعلانات والعروض</button><button class="admin-tab" data-admin-tab="settings">الإعدادات</button><div style="height:1px;background:rgba(255,255,255,.12);margin:16px 5px"></div><button class="admin-tab" id="adminLogout">تسجيل الخروج</button></aside>
+    <div class="admin-layout"><aside class="admin-sidebar"><div class="admin-side-brand"><div class="brand-mark">${I.brandmark}</div><div><b>مجمداتكو</b><small>إدارة المتجر</small></div></div><button class="admin-tab active" data-admin-tab="overview">نظرة عامة</button><button class="admin-tab" data-admin-tab="products">المنتجات</button><button class="admin-tab" data-admin-tab="categories">الأقسام</button><button class="admin-tab" data-admin-tab="orders">الطلبات</button><button class="admin-tab" data-admin-tab="marketing">الإعلانات والعروض</button><button class="admin-tab" data-admin-tab="settings">الإعدادات</button><button class="admin-tab" data-admin-tab="backup">النسخ الاحتياطي</button><div style="height:1px;background:rgba(255,255,255,.12);margin:16px 5px"></div><button class="admin-tab" id="adminLogout">تسجيل الخروج</button></aside>
     <main class="admin-main">
       <section data-admin-section="overview"><div class="admin-stat-grid"><div class="admin-stat"><div class="label">إجمالي المبيعات</div><div class="value">${totalSales.toFixed(0)} د</div><div class="trend">↑ 18.4% هذا الشهر</div></div><div class="admin-stat"><div class="label">الطلبات الجديدة</div><div class="value">${ORDERS.filter(o=>o.status!=='done').length}</div><div class="trend">↑ 6 طلبات اليوم</div></div><div class="admin-stat"><div class="label">المنتجات النشطة</div><div class="value">${PRODUCTS.length}</div><div class="trend">${CATS.length} أقسام مرتبطة</div></div><div class="admin-stat"><div class="label">متوسط قيمة الطلب</div><div class="value">${(totalSales/Math.max(ORDERS.length,1)).toFixed(0)} د</div><div class="trend">↑ 9.2% عن السابق</div></div></div><div class="admin-chart"><div class="admin-panel"><div class="admin-panel-head"><div><h3>نظرة على المبيعات</h3><p class="admin-panel-sub">آخر 7 أيام · بالدينار الأردني</p></div><span class="admin-badge green">+18.4%</span></div><div class="admin-bars"><div class="admin-bar" style="height:48%"><span>سبت</span></div><div class="admin-bar" style="height:68%"><span>أحد</span></div><div class="admin-bar" style="height:54%"><span>اثن</span></div><div class="admin-bar" style="height:82%"><span>ثلا</span></div><div class="admin-bar" style="height:62%"><span>أرب</span></div><div class="admin-bar" style="height:94%"><span>خمي</span></div><div class="admin-bar" style="height:76%"><span>جمع</span></div></div></div><div class="admin-panel"><div class="admin-panel-head"><div><h3>آخر الطلبات</h3><p class="admin-panel-sub">تابع حالة طلبات التوريد</p></div><button class="admin-btn ghost" data-admin-tab="orders">عرض الكل</button></div>${ORDERS.slice(0,4).map(o=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #eef3f5;font-size:12px"><b>${o.id}</b><span style="color:#8295a3">${o.total.toFixed(2)} د.أ</span><span class="admin-badge ${o.status==='done'?'green':o.status==='transit'?'blue':'orange'}">${o.statusLabel}</span></div>`).join('')}</div></div></section>
-      <section data-admin-section="products" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إدارة المنتجات</h3><p class="admin-panel-sub">أضف، عدّل، احذف، وتابع توفر الأصناف</p></div><button class="admin-btn primary" id="adminAddProduct">+ إضافة منتج</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>المنتج</th><th>القسم</th><th>السعر</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${productRows}</tbody></table></div></div><div class="admin-panel" id="adminProductForm" hidden><div class="admin-panel-head"><h3>إضافة منتج جديد</h3><button class="admin-btn ghost" id="closeProductForm">إغلاق</button></div><div class="admin-form-grid"><div class="admin-field"><label>اسم المنتج</label><input id="afName" placeholder="مثال: فروج كامل مجمد"></div><div class="admin-field"><label>القسم</label><select id="afCat">${catOptions}</select></div><div class="admin-field"><label>الشركة</label><input id="afBrand" placeholder="اسم الشركة"></div><div class="admin-field"><label>السعر (د.أ)</label><input id="afPrice" type="number" step="0.01" placeholder="0.00"></div><div class="admin-field"><label>الوحدة</label><input id="afUnit" placeholder="كرتونة 10 كغم"></div><div class="admin-field"><label>المخزون</label><input id="afStock" type="number" placeholder="100"></div></div><button class="admin-btn primary" id="afSubmit" style="margin-top:15px">حفظ المنتج</button></div></section>
+      <section data-admin-section="products" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إدارة المنتجات</h3><p class="admin-panel-sub">أضف، عدّل، احذف، وتابع توفر الأصناف</p></div><button class="admin-btn primary" id="adminAddProduct">+ إضافة منتج</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>المنتج</th><th>القسم</th><th>السعر والمخزون</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${productRows}</tbody></table></div></div><div class="admin-panel" id="adminProductForm" hidden><div class="admin-panel-head"><h3>إضافة منتج جديد</h3><button class="admin-btn ghost" id="closeProductForm">إغلاق</button></div><div class="admin-form-grid"><div class="admin-field"><label>اسم المنتج</label><input id="afName" placeholder="مثال: فروج كامل مجمد"></div><div class="admin-field"><label>القسم</label><select id="afCat">${catOptions}</select></div><div class="admin-field"><label>الشركة</label><input id="afBrand" placeholder="اسم الشركة"></div><div class="admin-field"><label>السعر (د.أ)</label><input id="afPrice" type="number" step="0.01" placeholder="0.00"></div><div class="admin-field"><label>الوحدة</label><input id="afUnit" placeholder="كرتونة 10 كغم"></div><div class="admin-field"><label>المخزون</label><input id="afStock" type="number" placeholder="100"></div><div class="admin-field"><label>صورة المنتج</label><input id="afImage" type="file" accept="image/*"></div></div><div id="afImagePreview" class="admin-note" hidden></div><button class="admin-btn primary" id="afSubmit" style="margin-top:15px">حفظ المنتج</button></div></section>
       <section data-admin-section="categories" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>الأقسام والتصنيفات</h3><p class="admin-panel-sub">نظّم كتالوج المتجر حسب احتياج المحلات</p></div><button class="admin-btn primary" id="adminAddCategory">+ إضافة قسم</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>القسم</th><th>عدد المنتجات</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${categoryRows}</tbody></table></div></div></section>
-      <section data-admin-section="orders" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إدارة الطلبات</h3><p class="admin-panel-sub">حدّث حالة الطلبات وتابع التوريد</p></div><button class="admin-btn ghost">تصدير التقرير</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th>تفاصيل</th></tr></thead><tbody>${orderRows}</tbody></table></div></div></section>
+      <section data-admin-section="orders" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إدارة الطلبات</h3><p class="admin-panel-sub">حدّث حالة الطلبات وتابع التوريد</p></div><button class="admin-btn ghost" id="exportReport">تصدير CSV</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th>تفاصيل</th></tr></thead><tbody>${orderRows}</tbody></table></div></div></section>
       <section data-admin-section="marketing" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>الإعلانات والعروض</h3><p class="admin-panel-sub">تحكم بما يظهر للعملاء على الصفحة الرئيسية</p></div><button class="admin-btn primary" id="afBannerBtn">+ إضافة إعلان</button></div><input type="file" id="afBannerFile" accept="image/*" hidden><div id="afBannerStatus" class="admin-empty">${BANNERS.length?'لديك '+BANNERS.length+' إعلانات مفعلة':'لم تتم إضافة إعلانات بعد — ابدأ بإضافة صورة بانر جذابة'}</div>${BANNERS.map(b=>`<div class="admin-product-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #eef3f5"><span>إعلان #${String(b.id).slice(-5)}</span><button class="admin-btn danger" data-del-banner="${b.id}">حذف</button></div>`).join('')}</div></section>
-      <section data-admin-section="settings" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إعدادات المتجر</h3><p class="admin-panel-sub">بيانات المؤسسة وخيارات التشغيل</p></div><button class="admin-btn primary" id="saveSettings">حفظ التغييرات</button></div><div class="admin-form-grid"><div class="admin-field"><label>اسم المتجر</label><input value="مجمداتكو"></div><div class="admin-field"><label>اسم المؤسسة</label><input value="مؤسسة المزرعاوي للمجمدات"></div><div class="admin-field"><label>هاتف خدمة العملاء</label><input value="079xxxxxxx"></div><div class="admin-field"><label>حد الطلب الأدنى</label><input value="50 د.أ"></div></div></div></section>
-    </main></div></div>`;
+      <section data-admin-section="settings" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إعدادات المتجر</h3><p class="admin-panel-sub">بيانات المؤسسة وخيارات التشغيل</p></div><button class="admin-btn primary" id="saveSettings">حفظ التغييرات</button></div><div class="admin-form-grid"><div class="admin-field"><label>اسم المتجر</label><input value="مجمداتكو"></div><div class="admin-field"><label>اسم المؤسسة</label><input value="مؤسسة المزرعاوي للمجمدات"></div><div class="admin-field"><label>هاتف خدمة العملاء</label><input value="079xxxxxxx"></div><div class="admin-field"><label>حد الطلب الأدنى</label><input value="50 د.أ"></div></div><div class="admin-settings-actions"><button class="admin-btn ghost" id="enableNotifications">تفعيل إشعارات الطلبات</button><span class="admin-note" style="margin:0">واتساب/SMS يحتاج مزودًا خارجيًا؛ الإشعارات المحلية تعمل مباشرة بعد السماح من المتصفح.</span></div></div></section>
+    </main><section data-admin-section="backup" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>النسخ الاحتياطي والربط</h3><p class="admin-panel-sub">احفظ بيانات المتجر أو استعدها على هذا الجهاز</p></div><span class="admin-badge green">تخزين محلي مفعل</span></div><div class="admin-note">للتشغيل بين عدة أجهزة، أضف إعدادات Firebase في أعلى الملف. هذه النسخة تستخدم التخزين المحلي الآن حتى لا تضيع تعديلاتك عند إعادة فتح التطبيق على نفس الجهاز.</div><div class="admin-settings-actions"><button class="admin-btn primary" id="downloadBackup">تنزيل نسخة JSON</button><button class="admin-btn ghost" id="restoreBackupBtn">استعادة نسخة</button><input id="restoreBackupFile" type="file" accept="application/json" hidden></div></div></section></div></div>`;
 }
 
 /* ======================= NAVIGATION ENGINE ======================= */
@@ -1524,7 +1575,7 @@ function bindScreenEvents(root, screenName){
 
   if(screenName==='review'){
     const btn = root.querySelector('#submitOrderBtn');
-    if(btn) btn.addEventListener('click', ()=>{ go('confirm'); });
+    if(btn) btn.addEventListener('click', ()=>{ createOrderFromCart(); go('confirm'); });
   }
 
   if(screenName==='confirm'){
@@ -1547,12 +1598,19 @@ function bindScreenEvents(root, screenName){
     const showSection = tab => { root.querySelectorAll('[data-admin-section]').forEach(s=>s.hidden=s.dataset.adminSection!==tab); root.querySelectorAll('[data-admin-tab]').forEach(b=>b.classList.toggle('active',b.dataset.adminTab===tab)); };
     root.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>showSection(b.dataset.adminTab)));
     root.querySelector('#adminStorePreview')?.addEventListener('click',()=>{ state.stack=['home']; go('home',{replace:true,dir:'back'}); });
-    root.querySelectorAll('[data-del-product]').forEach(btn=>btn.addEventListener('click',()=>{ if(confirm('حذف هذا المنتج؟')){ PRODUCTS=PRODUCTS.filter(p=>p.id!==btn.dataset.delProduct); OFFERS=OFFERS.filter(p=>p.id!==btn.dataset.delProduct); NEW_ARRIVALS=NEW_ARRIVALS.filter(p=>p.id!==btn.dataset.delProduct); showToast('تم حذف المنتج'); go('admin',{replace:true}); }}));
-    root.querySelectorAll('[data-edit-product]').forEach(btn=>btn.addEventListener('click',()=>{ const p=productById(btn.dataset.editProduct); showSection('products'); const f=root.querySelector('#adminProductForm'); f.hidden=false; root.querySelector('#afName').value=p.name; root.querySelector('#afBrand').value=p.brand; root.querySelector('#afPrice').value=p.price; root.querySelector('#afUnit').value=p.unit; f.dataset.editing=p.id; }));
-    root.querySelector('#adminAddProduct')?.addEventListener('click',()=>{ const f=root.querySelector('#adminProductForm'); f.hidden=false; f.dataset.editing=''; });
+    if(currentAdminRole==='warehouse'){ root.querySelectorAll('[data-admin-tab]').forEach(b=>{if(['overview','products','orders'].indexOf(b.dataset.adminTab)<0)b.style.display='none';}); }
+    root.querySelector('#exportReport')?.addEventListener('click',exportStoreReport);
+    root.querySelector('#downloadBackup')?.addEventListener('click',downloadBackup);
+    root.querySelector('#restoreBackupBtn')?.addEventListener('click',()=>root.querySelector('#restoreBackupFile').click());
+    root.querySelector('#restoreBackupFile')?.addEventListener('change',e=>{if(e.target.files[0])restoreBackup(e.target.files[0]);});
+    root.querySelector('#enableNotifications')?.addEventListener('click',async()=>{if('Notification' in window){const r=await Notification.requestPermission();showToast(r==='granted'?'تم تفعيل إشعارات الطلبات ✓':'لم يتم السماح بالإشعارات');}else showToast('المتصفح لا يدعم الإشعارات');});
+    root.querySelector('#afImage')?.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{pendingProductImage=r.result;const p=root.querySelector('#afImagePreview');p.hidden=false;p.textContent='تم اختيار صورة المنتج ✓';};r.readAsDataURL(f);});
+    root.querySelectorAll('[data-del-product]').forEach(btn=>btn.addEventListener('click',()=>{ if(confirm('حذف هذا المنتج؟')){ PRODUCTS=PRODUCTS.filter(p=>p.id!==btn.dataset.delProduct); OFFERS=OFFERS.filter(p=>p.id!==btn.dataset.delProduct); NEW_ARRIVALS=NEW_ARRIVALS.filter(p=>p.id!==btn.dataset.delProduct); showToast('تم حذف المنتج'); saveStore(); go('admin',{replace:true}); }}));
+    root.querySelectorAll('[data-edit-product]').forEach(btn=>btn.addEventListener('click',()=>{ const p=productById(btn.dataset.editProduct); showSection('products'); const f=root.querySelector('#adminProductForm'); f.hidden=false; root.querySelector('#afName').value=p.name; root.querySelector('#afBrand').value=p.brand; root.querySelector('#afPrice').value=p.price; root.querySelector('#afUnit').value=p.unit; root.querySelector('#afStock').value=p.stock||0; pendingProductImage=p.image||''; f.dataset.editing=p.id; }));
+    root.querySelector('#adminAddProduct')?.addEventListener('click',()=>{ pendingProductImage=''; const f=root.querySelector('#adminProductForm'); f.hidden=false; f.dataset.editing=''; });
     root.querySelector('#closeProductForm')?.addEventListener('click',()=>root.querySelector('#adminProductForm').hidden=true);
-    root.querySelector('#afSubmit')?.addEventListener('click',()=>{ const name=root.querySelector('#afName').value.trim(), catId=root.querySelector('#afCat').value, brand=root.querySelector('#afBrand').value.trim()||'—', price=parseFloat(root.querySelector('#afPrice').value), unit=root.querySelector('#afUnit').value.trim()||'قطعة', f=root.querySelector('#adminProductForm'); if(!name||isNaN(price)||price<=0){showToast('الرجاء تعبئة اسم المنتج والسعر');return;} if(f.dataset.editing){const p=productById(f.dataset.editing); Object.assign(p,{name,cat:catId,brand,price,unit}); showToast('تم تحديث المنتج ✓');} else {const c=CAT_MAP[catId]; PRODUCTS.push(prod('p'+(productSeq++),name,'—',brand,price,null,catId,c.grad,c.icon,null,unit)); showToast('تمت إضافة المنتج ✓');} go('admin',{replace:true}); });
-    root.querySelectorAll('[data-order-status]').forEach(sel=>sel.addEventListener('change',()=>{ const o=ORDERS.find(x=>x.id===sel.dataset.orderStatus); if(o){o.status=sel.value;o.statusLabel=sel.options[sel.selectedIndex].text;showToast('تم تحديث حالة الطلب');} }));
+    root.querySelector('#afSubmit')?.addEventListener('click',()=>{ const name=root.querySelector('#afName').value.trim(), catId=root.querySelector('#afCat').value, brand=root.querySelector('#afBrand').value.trim()||'—', price=parseFloat(root.querySelector('#afPrice').value), unit=root.querySelector('#afUnit').value.trim()||'قطعة', stock=parseInt(root.querySelector('#afStock').value||'0',10), f=root.querySelector('#adminProductForm'); if(!name||isNaN(price)||price<=0){showToast('الرجاء تعبئة اسم المنتج والسعر');return;} if(f.dataset.editing){const p=productById(f.dataset.editing); Object.assign(p,{name,cat:catId,brand,price,unit,stock,image:pendingProductImage||p.image||''}); showToast('تم تحديث المنتج ✓'); saveStore();} else {const c=CAT_MAP[catId]; const np=prod('p'+(productSeq++),name,'—',brand,price,null,catId,c.grad,c.icon,null,unit); np.stock=stock; np.image=pendingProductImage||''; PRODUCTS.push(np); showToast('تمت إضافة المنتج ✓'); saveStore();} go('admin',{replace:true}); });
+    root.querySelectorAll('[data-order-status]').forEach(sel=>sel.addEventListener('change',()=>{ const o=ORDERS.find(x=>x.id===sel.dataset.orderStatus); if(o){o.status=sel.value;o.statusLabel=sel.options[sel.selectedIndex].text;showToast('تم تحديث حالة الطلب'); saveStore(); notifyOrder(`تغيرت حالة ${o.id} إلى ${o.statusLabel}`);} }));
     root.querySelectorAll('[data-view-order]').forEach(btn=>btn.addEventListener('click',()=>showToast('تفاصيل '+btn.dataset.viewOrder+' جاهزة للمراجعة')));
     root.querySelector('#adminAddCategory')?.addEventListener('click',()=>{ const name=prompt('اسم القسم الجديد:'); if(name){showToast('تمت إضافة قسم '+name+' — يمكنك ربطه بالكتالوج بعد الحفظ');} });
     root.querySelector('#saveSettings')?.addEventListener('click',()=>showToast('تم حفظ إعدادات المتجر ✓'));
@@ -1574,7 +1632,7 @@ function showAdminPrompt(){
   wrap.innerHTML = `
     <div class="modal-card">
       <h3>لوحة التحكم الداخلية</h3>
-      <p>أدخل كلمة المرور للمتابعة</p>
+      <p>اختر الدور وأدخل كلمة المرور</p><select id="adminRole" class="admin-select" style="width:100%;margin-bottom:10px"><option value="manager">مدير المتجر</option><option value="warehouse">مسؤول المخزون والطلبات</option></select>
       <input type="password" id="adminPass" inputmode="numeric" placeholder="••••••">
       <div class="modal-actions">
         <button class="modal-btn-cancel" id="adminCancel">إلغاء</button>
@@ -1587,7 +1645,7 @@ function showAdminPrompt(){
   const close = ()=> wrap.remove();
   wrap.querySelector('#adminCancel').addEventListener('click', close);
   const submit = ()=>{
-    if(input.value === ADMIN_PASSWORD){
+    const role=wrap.querySelector('#adminRole').value; if(input.value === (role==='warehouse'?'199612':ADMIN_PASSWORD)){ currentAdminRole=role;
       close();
       state.stack.push('admin');
       go('admin');
