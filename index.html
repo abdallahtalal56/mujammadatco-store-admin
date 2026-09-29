@@ -749,7 +749,7 @@ button:focus-visible, .cat-card:focus-visible, .pcard-img:focus-visible{
 
 <script>
 /* ==================================================================
-   ⚙️ إعدادات الربط الخارجي — عدّل هذا القسم فقط، لا تلمس الباقي
+   ⚙️ إعدادات الربط الخارجي — Supabase هو مخزن الصور والبيانات
    ==================================================================
    1) Firebase (لتخزين قائمة صور اللوحة الإعلانية):
       - سجّل مجانًا على https://console.firebase.google.com
@@ -1021,33 +1021,27 @@ function restoreBackup(file){const r=new FileReader();r.onload=()=>{try{localSto
 let BANNERS = []; // {id, url, createdAt}
 hydrateStore();
 async function loadBanners(){
-  if(!firebaseReady) return;
   try{
-    const snap = await db.collection('banners').orderBy('createdAt','desc').get();
-    BANNERS = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const raw=localStorage.getItem(STORE_KEY); const saved=raw?JSON.parse(raw):null;
+    if(saved && Array.isArray(saved.banners)) BANNERS=saved.banners;
   }catch(e){ console.warn('loadBanners failed:', e); }
 }
 async function uploadBannerImage(file){
-  if(IMGBB_API_KEY.includes('ضع')) throw new Error('NO_IMGBB_KEY');
-  const dataUrl = await fileToBase64(file);
-  const form = new FormData();
-  form.append('image', dataUrl.split(',')[1]);
-  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {method:'POST', body:form});
-  const data = await res.json();
-  if(!data.success) throw new Error('IMGBB_UPLOAD_FAILED');
-  const url = data.data.url;
-  if(firebaseReady){
-    await db.collection('banners').add({url, createdAt: Date.now()});
-    await loadBanners();
-  } else {
-    BANNERS.unshift({id:'local-'+Date.now(), url}); saveStore();
+  let url='';
+  if(supabaseClient && supabaseSession){
+    const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+    const filePath=`${supabaseSession.user.id}/banners/${Date.now()}.${ext}`;
+    const up=await supabaseClient.storage.from('product-images').upload(filePath,file,{upsert:true,contentType:file.type||'image/jpeg'});
+    if(!up.error) url=supabaseClient.storage.from('product-images').getPublicUrl(filePath).data.publicUrl;
   }
+  if(!url) url=await fileToBase64(file);
+  BANNERS.unshift({id:'banner-'+Date.now(),url,createdAt:Date.now(),storage:url.startsWith('data:')?'local':'supabase'});
+  saveStore();
+  await loadBanners();
 }
 async function deleteBannerImage(id){
-  BANNERS = BANNERS.filter(b=>b.id!==id);
-  if(firebaseReady && !String(id).startsWith('local-')){
-    try{ await db.collection('banners').doc(id).delete(); }catch(e){ console.warn(e); }
-  }
+  BANNERS=BANNERS.filter(b=>b.id!==id);
+  saveStore();
 }
 
 function cartCount(){ return Object.values(state.cart).reduce((a,b)=>a+b,0); }
@@ -1656,7 +1650,7 @@ function bindScreenEvents(root, screenName){
     root.querySelectorAll('[data-view-order]').forEach(btn=>btn.addEventListener('click',()=>showToast('تفاصيل '+btn.dataset.viewOrder+' جاهزة للمراجعة')));
     root.querySelector('#adminAddCategory')?.addEventListener('click',()=>{ const name=prompt('اسم القسم الجديد:'); if(name){showToast('تمت إضافة قسم '+name+' — يمكنك ربطه بالكتالوج بعد الحفظ');} });
     root.querySelector('#saveSettings')?.addEventListener('click',()=>showToast('تم حفظ إعدادات المتجر ✓'));
-    const bannerBtn=root.querySelector('#afBannerBtn'), bannerFile=root.querySelector('#afBannerFile'); if(bannerBtn&&bannerFile){bannerBtn.addEventListener('click',()=>bannerFile.click());bannerFile.addEventListener('change',async()=>{const file=bannerFile.files[0];if(!file)return;try{await uploadBannerImage(file);showToast('تمت إضافة الإعلان ✓');go('admin',{replace:true});}catch(e){showToast(e.message==='NO_IMGBB_KEY'?'أضف مفتاح imgbb API أولًا':'تعذّر رفع الإعلان');}});}
+    const bannerBtn=root.querySelector('#afBannerBtn'), bannerFile=root.querySelector('#afBannerFile'); if(bannerBtn&&bannerFile){bannerBtn.addEventListener('click',()=>bannerFile.click());bannerFile.addEventListener('change',async()=>{const file=bannerFile.files[0];if(!file)return;try{await uploadBannerImage(file);showToast('تمت إضافة الإعلان ✓');go('admin',{replace:true});}catch(e){showToast('تعذّر رفع الإعلان، جرّب صورة أصغر');}});}
     root.querySelectorAll('[data-del-banner]').forEach(btn=>btn.addEventListener('click',async()=>{await deleteBannerImage(btn.dataset.delBanner);showToast('تم حذف الإعلان');go('admin',{replace:true});}));
     root.querySelector('#adminLogout')?.addEventListener('click',()=>{state.stack=['home'];go('home',{replace:true,dir:'back'});});
   }
