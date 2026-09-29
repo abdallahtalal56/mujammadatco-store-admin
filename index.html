@@ -707,6 +707,8 @@ button:focus-visible, .cat-card:focus-visible, .pcard-img:focus-visible{
 .ad-slide img{width:100%;height:100%;object-fit:cover;display:block;}
 
 .customer-auth-card{margin:18px;background:var(--surface,#fff);border-radius:22px;padding:24px;box-shadow:var(--shadow-md,0 8px 24px rgba(0,0,0,.08));text-align:center}.customer-auth-card h3{margin:10px 0 6px;color:var(--ink,#17323f)}.customer-auth-sub{color:var(--ink-muted,#6f838d);font-size:13px;line-height:1.7;margin:0 auto 18px;max-width:320px}.customer-form{text-align:right;display:grid;gap:8px}.customer-form label{font-size:12px;color:var(--ink-muted,#6f838d);font-weight:700;margin-top:6px}.customer-form input,.customer-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--line,#dce5e8);border-radius:12px;padding:12px;font:inherit;background:#fff;color:var(--ink,#17323f)}.customer-form textarea{min-height:84px;resize:vertical}.btn-secondary{border:1px solid var(--line,#dce5e8);background:transparent;border-radius:12px;padding:12px;color:var(--ink,#17323f);font:inherit}
+
+.logo-splash{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0 4px;animation:splashIn .8s cubic-bezier(.23,1,.32,1) both}.logo-splash .brand-mark{width:68px;height:68px;border-radius:22px;display:grid;place-items:center;background:linear-gradient(145deg,#fff,#e9f6fa);box-shadow:0 14px 28px rgba(14,58,92,.16);animation:logoFloat 3.6s ease-in-out .8s infinite}.logo-splash .brand-mark svg{width:42px;height:42px}.logo-splash .splash-title{font-family:'Almarai';font-weight:800;color:var(--primary);font-size:18px}.logo-splash .splash-caption{font-size:11px;color:var(--ink-soft)}@keyframes splashIn{from{opacity:0;transform:translateY(14px) scale(.94)}to{opacity:1;transform:none}}@keyframes logoFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-5px) rotate(2deg)}}.hero-image{margin:14px 18px 0;border-radius:18px;overflow:hidden;box-shadow:var(--shadow-md);height:150px;background:linear-gradient(135deg,#155585,#37b7d8)}.hero-image img{width:100%;height:100%;object-fit:cover;display:block}.banner-admin-thumb{width:64px;height:42px;border-radius:8px;object-fit:cover;display:block}.banner-actions{display:flex;gap:6px;align-items:center}.admin-btn.small{padding:6px 9px;font-size:10px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
@@ -990,7 +992,7 @@ let currentAdminRole = 'manager';
 let pendingProductImage = '';
 function defaultProducts(){ return []; }
 function saveStore(){
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify({products:PRODUCTS,offers:OFFERS,newArrivals:NEW_ARRIVALS,orders:ORDERS,productSeq,banners:BANNERS,settings:window.storeSettings||{}})); }catch(e){ console.warn('saveStore failed',e); }
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify({products:PRODUCTS,offers:OFFERS,newArrivals:NEW_ARRIVALS,orders:ORDERS,productSeq,banners:BANNERS,heroImage,settings:window.storeSettings||{}})); }catch(e){ console.warn('saveStore failed',e); }
 }
 function hydrateStore(){
   try{
@@ -1019,14 +1021,16 @@ function downloadBackup(){const a=document.createElement('a');a.href=URL.createO
 function restoreBackup(file){const r=new FileReader();r.onload=()=>{try{localStorage.setItem(STORE_KEY,r.result);location.reload();}catch(e){showToast('ملف النسخة الاحتياطية غير صالح');}};r.readAsText(file);}
 /* ======================= لوحة الإعلانات (Firebase + imgbb) ======================= */
 let BANNERS = []; // {id, url, createdAt}
+let heroImage = '';
+let bannerEditingId = null;
 hydrateStore();
 async function loadBanners(){
   try{
     const raw=localStorage.getItem(STORE_KEY); const saved=raw?JSON.parse(raw):null;
-    if(saved && Array.isArray(saved.banners)) BANNERS=saved.banners;
+    if(saved && Array.isArray(saved.banners)) BANNERS=saved.banners; if(saved?.heroImage) heroImage=saved.heroImage;
   }catch(e){ console.warn('loadBanners failed:', e); }
 }
-async function uploadBannerImage(file){
+async function uploadBannerImage(file,replaceId=null){
   let url='';
   if(supabaseClient && supabaseSession){
     const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
@@ -1035,9 +1039,18 @@ async function uploadBannerImage(file){
     if(!up.error) url=supabaseClient.storage.from('product-images').getPublicUrl(filePath).data.publicUrl;
   }
   if(!url) url=await fileToBase64(file);
-  BANNERS.unshift({id:'banner-'+Date.now(),url,createdAt:Date.now(),storage:url.startsWith('data:')?'local':'supabase'});
-  saveStore();
-  await loadBanners();
+  const item={id:replaceId||'banner-'+Date.now(),url,createdAt:Date.now(),storage:url.startsWith('data:')?'local':'supabase'};
+  BANNERS=replaceId?BANNERS.map(b=>b.id===replaceId?item:b):[item,...BANNERS];
+  saveStore(); await loadBanners();
+}
+async function uploadHeroImage(file){
+  let url='';
+  if(supabaseClient && supabaseSession){
+    const ext=(file.name.split('.').pop()||'jpg').toLowerCase(); const filePath=`${supabaseSession.user.id}/hero/${Date.now()}.${ext}`;
+    const up=await supabaseClient.storage.from('product-images').upload(filePath,file,{upsert:true,contentType:file.type||'image/jpeg'});
+    if(!up.error) url=supabaseClient.storage.from('product-images').getPublicUrl(filePath).data.publicUrl;
+  }
+  heroImage=url||await fileToBase64(file); saveStore();
 }
 async function deleteBannerImage(id){
   BANNERS=BANNERS.filter(b=>b.id!==id);
@@ -1122,8 +1135,9 @@ function renderHome(){
   <div class="app-header">
     <div class="header-top">
       <div class="brand">
+        <div class="brand-mark" id="brandMark" style="cursor:pointer;">${I.brandmark}</div>
         <div>
-          <div class="brand-name" id="brandMark" style="cursor:pointer;">مجمداتكو</div>
+          <div class="brand-name">مجمداتكو</div>
           <div class="brand-sub">مؤسسة المزرعاوي للمجمدات</div>
         </div>
       </div>
@@ -1436,6 +1450,7 @@ function renderAccount(){
   <div class="statusbar"><span>9:41</span><span></span></div>
   <div class="cat-header" style="border-radius:0 0 22px 22px;"><div class="cat-header-top"><div class="cat-header-title">حساب العميل</div></div></div>
   <div class="customer-auth-card">
+    <div class="logo-splash"><div class="brand-mark">${I.brandmark}</div><div class="splash-title">مجمداتكو</div><div class="splash-caption">توريد المجمدات للمحلات بثقة</div></div>
     <div class="avatar">${I.store}</div>
     <h3>${p?'أهلاً '+p.name:'سجّل دخولك للطلب بسهولة'}</h3>
     <p class="customer-auth-sub">احفظ بياناتك وموقعك لتصل طلباتك بسرعة مثل إيلا ستورز.</p>
@@ -1481,7 +1496,7 @@ function renderAdmin(){
       <section data-admin-section="products" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إدارة المنتجات</h3><p class="admin-panel-sub">أضف، عدّل، احذف، وتابع توفر الأصناف</p></div><button class="admin-btn primary" id="adminAddProduct">+ إضافة منتج</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>المنتج</th><th>القسم</th><th>السعر والمخزون</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${productRows}</tbody></table></div></div><div class="admin-panel" id="adminProductForm" hidden><div class="admin-panel-head"><h3>إضافة منتج جديد</h3><button class="admin-btn ghost" id="closeProductForm">إغلاق</button></div><div class="admin-form-grid"><div class="admin-field"><label>اسم المنتج</label><input id="afName" placeholder="مثال: فروج كامل مجمد"></div><div class="admin-field"><label>القسم</label><select id="afCat">${catOptions}</select></div><div class="admin-field"><label>الشركة</label><input id="afBrand" placeholder="اسم الشركة"></div><div class="admin-field"><label>السعر (د.أ)</label><input id="afPrice" type="number" step="0.01" placeholder="0.00"></div><div class="admin-field"><label>الوحدة</label><input id="afUnit" placeholder="كرتونة 10 كغم"></div><div class="admin-field"><label>المخزون</label><input id="afStock" type="number" placeholder="100"></div><div class="admin-field"><label>صورة المنتج</label><input id="afImage" type="file" accept="image/*"></div></div><div id="afImagePreview" class="admin-note" hidden></div><button class="admin-btn primary" id="afSubmit" style="margin-top:15px">حفظ المنتج</button></div></section>
       <section data-admin-section="categories" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>الأقسام والتصنيفات</h3><p class="admin-panel-sub">نظّم كتالوج المتجر حسب احتياج المحلات</p></div><button class="admin-btn primary" id="adminAddCategory">+ إضافة قسم</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>القسم</th><th>عدد المنتجات</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${categoryRows}</tbody></table></div></div></section>
       <section data-admin-section="orders" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إدارة الطلبات</h3><p class="admin-panel-sub">حدّث حالة الطلبات وتابع التوريد</p></div><button class="admin-btn ghost" id="exportReport">تصدير CSV</button></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th>تفاصيل</th></tr></thead><tbody>${orderRows}</tbody></table></div></div></section>
-      <section data-admin-section="marketing" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>الإعلانات والعروض</h3><p class="admin-panel-sub">تحكم بما يظهر للعملاء على الصفحة الرئيسية</p></div><button class="admin-btn primary" id="afBannerBtn">+ إضافة إعلان</button></div><input type="file" id="afBannerFile" accept="image/*" hidden><div id="afBannerStatus" class="admin-empty">${BANNERS.length?'لديك '+BANNERS.length+' إعلانات مفعلة':'لم تتم إضافة إعلانات بعد — ابدأ بإضافة صورة بانر جذابة'}</div>${BANNERS.map(b=>`<div class="admin-product-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #eef3f5"><span>إعلان #${String(b.id).slice(-5)}</span><button class="admin-btn danger" data-del-banner="${b.id}">حذف</button></div>`).join('')}</div></section>
+      <section data-admin-section="marketing" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>الإعلانات والصورة الرئيسية</h3><p class="admin-panel-sub">تحكم بما يظهر للعملاء على الصفحة الرئيسية</p></div></div><div class="admin-settings-actions"><button class="admin-btn primary" id="afHeroBtn">+ صورة القسم الرئيسي</button><button class="admin-btn primary" id="afBannerBtn">+ إضافة إعلان</button></div><input type="file" id="afHeroFile" accept="image/*" hidden><input type="file" id="afBannerFile" accept="image/*" hidden><div id="afBannerStatus" class="admin-empty">${heroImage?'الصورة الرئيسية مفعّلة':'لم تتم إضافة صورة رئيسية بعد'} · ${BANNERS.length?'لديك '+BANNERS.length+' إعلانات مفعلة':'لا توجد إعلانات بعد'}</div>${BANNERS.map(b=>`<div class="admin-product-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #eef3f5;gap:10px"><img class="banner-admin-thumb" src="${b.url}" alt="إعلان"><span style="flex:1">إعلان #${String(b.id).slice(-5)}</span><div class="banner-actions"><button class="admin-btn small ghost" data-edit-banner="${b.id}">تعديل</button><button class="admin-btn small danger" data-del-banner="${b.id}">حذف</button></div></div>`).join('')}</div></section>
       <section data-admin-section="settings" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>إعدادات المتجر</h3><p class="admin-panel-sub">بيانات المؤسسة وخيارات التشغيل</p></div><button class="admin-btn primary" id="saveSettings">حفظ التغييرات</button></div><div class="admin-form-grid"><div class="admin-field"><label>اسم المتجر</label><input value="مجمداتكو"></div><div class="admin-field"><label>اسم المؤسسة</label><input value="مؤسسة المزرعاوي للمجمدات"></div><div class="admin-field"><label>هاتف خدمة العملاء</label><input value="079xxxxxxx"></div><div class="admin-field"><label>حد الطلب الأدنى</label><input value="50 د.أ"></div></div><div class="admin-settings-actions"><button class="admin-btn ghost" id="enableNotifications">تفعيل إشعارات الطلبات</button><span class="admin-note" style="margin:0">واتساب/SMS يحتاج مزودًا خارجيًا؛ الإشعارات المحلية تعمل مباشرة بعد السماح من المتصفح.</span></div></div></section>
     </main><section data-admin-section="backup" hidden><div class="admin-panel"><div class="admin-panel-head"><div><h3>النسخ الاحتياطي والربط</h3><p class="admin-panel-sub">احفظ بيانات المتجر أو استعدها على هذا الجهاز</p></div><span class="admin-badge green">تخزين محلي مفعل</span></div><div class="admin-note">للتشغيل بين عدة أجهزة، أضف إعدادات Firebase في أعلى الملف. هذه النسخة تستخدم التخزين المحلي الآن حتى لا تضيع تعديلاتك عند إعادة فتح التطبيق على نفس الجهاز.</div><div class="admin-settings-actions"><button class="admin-btn primary" id="downloadBackup">تنزيل نسخة JSON</button><button class="admin-btn ghost" id="restoreBackupBtn">استعادة نسخة</button><input id="restoreBackupFile" type="file" accept="application/json" hidden></div></div></section></div></div>`;
 }
@@ -1650,8 +1665,10 @@ function bindScreenEvents(root, screenName){
     root.querySelectorAll('[data-view-order]').forEach(btn=>btn.addEventListener('click',()=>showToast('تفاصيل '+btn.dataset.viewOrder+' جاهزة للمراجعة')));
     root.querySelector('#adminAddCategory')?.addEventListener('click',()=>{ const name=prompt('اسم القسم الجديد:'); if(name){showToast('تمت إضافة قسم '+name+' — يمكنك ربطه بالكتالوج بعد الحفظ');} });
     root.querySelector('#saveSettings')?.addEventListener('click',()=>showToast('تم حفظ إعدادات المتجر ✓'));
-    const bannerBtn=root.querySelector('#afBannerBtn'), bannerFile=root.querySelector('#afBannerFile'); if(bannerBtn&&bannerFile){bannerBtn.addEventListener('click',()=>bannerFile.click());bannerFile.addEventListener('change',async()=>{const file=bannerFile.files[0];if(!file)return;try{await uploadBannerImage(file);showToast('تمت إضافة الإعلان ✓');go('admin',{replace:true});}catch(e){showToast('تعذّر رفع الإعلان، جرّب صورة أصغر');}});}
-    root.querySelectorAll('[data-del-banner]').forEach(btn=>btn.addEventListener('click',async()=>{await deleteBannerImage(btn.dataset.delBanner);showToast('تم حذف الإعلان');go('admin',{replace:true});}));
+    const heroBtn=root.querySelector('#afHeroBtn'), heroFile=root.querySelector('#afHeroFile'); if(heroBtn&&heroFile){heroBtn.addEventListener('click',()=>heroFile.click());heroFile.addEventListener('change',async()=>{const file=heroFile.files[0];if(!file)return;try{await uploadHeroImage(file);showToast('تم تحديث صورة القسم الرئيسي ✓');go('admin',{replace:true});}catch(e){showToast('تعذّر رفع الصورة الرئيسية');}});}
+    const bannerBtn=root.querySelector('#afBannerBtn'), bannerFile=root.querySelector('#afBannerFile'); if(bannerBtn&&bannerFile){bannerBtn.addEventListener('click',()=>{bannerEditingId=null;bannerFile.click();});bannerFile.addEventListener('change',async()=>{const file=bannerFile.files[0];if(!file)return;try{await uploadBannerImage(file,bannerEditingId);showToast(bannerEditingId?'تم تعديل الإعلان ✓':'تمت إضافة الإعلان ✓');bannerEditingId=null;go('admin',{replace:true});}catch(e){showToast('تعذّر رفع الإعلان، جرّب صورة أصغر');}});}
+    root.querySelectorAll('[data-edit-banner]').forEach(btn=>btn.addEventListener('click',()=>{bannerEditingId=btn.dataset.editBanner;bannerFile?.click();}));
+    root.querySelectorAll('[data-del-banner]').forEach(btn=>btn.addEventListener('click',async()=>{if(confirm('حذف هذا الإعلان؟')){await deleteBannerImage(btn.dataset.delBanner);showToast('تم حذف الإعلان');go('admin',{replace:true});}}));
     root.querySelector('#adminLogout')?.addEventListener('click',()=>{state.stack=['home'];go('home',{replace:true,dir:'back'});});
   }
 }
