@@ -917,6 +917,7 @@ const CATS = [
   {id:'americana', name:'منتجات أمريكانا', cls:'', grad:'135deg,#2C6FB0,#123F66', icon:I.burger},
   {id:'cheese', name:'الأجبان', cls:'', grad:'135deg,#DCA82E,#A87A18', icon:I.cheese},
   {id:'fruit', name:'الفواكه المجمدة', cls:'wide', grad:'120deg,#C6336B,#8C1D4B', icon:I.berry},
+  {id:'frozen_potatoes', name:'البطاطا المجمدة', cls:'', grad:'135deg,#C89028,#8A5B12', icon:I.box},
 ];
 const CAT_MAP = Object.fromEntries(CATS.map(c=>[c.id,c]));
 function catCount(catId){ return PRODUCTS.filter(p=>p.cat===catId).length; }
@@ -955,7 +956,7 @@ async function hydrateRemoteCustomer(){
 }
 async function syncProductsFromSupabase(){
   if(!supabaseClient) return;
-  try{ const r=await supabaseClient.from('products').select('id,legacy_id,name,brand,category,price,unit,stock,image_url,is_active').eq('is_active',true).order('created_at',{ascending:false}); if(!r.error && Array.isArray(r.data)){ PRODUCTS=r.data.map(x=>({id:x.legacy_id||x.id,name:x.name,weight:'—',brand:x.brand||'—',price:Number(x.price),cat:x.category,grad:CAT_MAP[x.category]?.grad||'135deg,#155585,#0E3A5C',icon:CAT_MAP[x.category]?.icon||I.box,unit:x.unit||'قطعة',stock:x.stock,image:x.image_url||'',remoteId:x.id})); OFFERS=[]; NEW_ARRIVALS=[]; } }catch(e){ console.warn('Supabase products unavailable',e); }
+  try{ const localProducts=[...PRODUCTS]; const r=await supabaseClient.from('products').select('id,legacy_id,name,brand,category,price,unit,stock,image_url,is_active').eq('is_active',true).order('created_at',{ascending:false}); if(!r.error && Array.isArray(r.data)){ const remote=r.data.map(x=>({id:x.legacy_id||x.id,name:x.name,weight:'—',brand:x.brand||'—',price:Number(x.price),cat:x.category,grad:CAT_MAP[x.category]?.grad||'135deg,#155585,#0E3A5C',icon:CAT_MAP[x.category]?.icon||I.box,unit:x.unit||'قطعة',stock:x.stock,image:x.image_url||'',remoteId:x.id})); const remoteIds=new Set(remote.map(p=>p.id)); PRODUCTS=[...remote,...localProducts.filter(p=>!remoteIds.has(p.id))]; OFFERS=[]; NEW_ARRIVALS=[]; saveStore(); } }catch(e){ console.warn('Supabase products unavailable',e); }
 }
 async function syncProfileToSupabase(profile){
   if(!supabaseClient || !supabaseSession) return;
@@ -1008,7 +1009,7 @@ function createOrderFromCart(){
   Object.entries(state.cart).forEach(([id,q])=>{const p=productById(id);if(p&&typeof p.stock==='number')p.stock=Math.max(0,p.stock-q);});
   saveStore(); notifyOrder(`تم استلام الطلب ${id} بقيمة ${total.toFixed(2)} د.أ`); return syncOrderToSupabase(total).then(()=>id).catch(e=>{console.warn('Remote order sync failed',e);return id;});
 }
-function productVisual(p,size){ if(p&&p.image) return `<img src="${p.image}" alt="${p.name||''}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:12px;">`; return sticker(p?.cat||'poultry',size); }
+function productVisual(p,size){ if(p&&p.image) return `<img class="product-photo" src="${p.image}" alt="${p.name||''}" style="width:${size}px!important;height:${size}px!important;max-width:${size}px;max-height:${size}px;object-fit:contain;border-radius:12px;display:block;">`; return sticker(p?.cat||'poultry',size); }
 function exportStoreReport(){
   const rows=[['رقم الطلب','التاريخ','الإجمالي','الحالة'],...ORDERS.map(o=>[o.id,o.date,o.total.toFixed(2),o.statusLabel])];
   const csv='\\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\\n');
@@ -1127,9 +1128,8 @@ function renderHome(){
   <div class="app-header">
     <div class="header-top">
       <div class="brand">
-        <div class="brand-mark" id="brandMark" style="cursor:pointer;">${I.brandmark}</div>
         <div>
-          <div class="brand-name">مجمداتكو</div>
+          <div class="brand-name" id="brandMark" style="cursor:pointer;">مجمداتكو</div>
           <div class="brand-sub">مؤسسة المزرعاوي للمجمدات</div>
         </div>
       </div>
