@@ -132,3 +132,7 @@ mujammadatco-app/
 This repository contains the final Mujammadatco B2B frozen-food storefront and administration dashboard. The customer app is available at the repository root for GitHub Pages. Supabase remains the remote database and storage backend.
 
 Admin access: tap the top header logo three times within two seconds, then enter the configured admin PIN.
+
+## Android release
+
+The native Android WebView wrapper is available under `android/`. Release artifacts are distributed separately because APK/AAB binaries and signing keys are not committed to the public repository.
