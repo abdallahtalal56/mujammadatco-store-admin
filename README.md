@@ -126,3 +126,9 @@ mujammadatco-app/
 - **الإشعارات:** إشعارات المتصفح المحلية جاهزة. WhatsApp/SMS يحتاج مزودًا خارجيًا ومفتاح API.
 - **Firebase:** إعداداته موجودة أعلى `index.html`، وتفعيلها ينقل البانرات إلى Firestore؛ ربط المنتجات والطلبات بقاعدة بيانات كاملة يحتاج Backend/Auth في مرحلة الإنتاج.
 - **GitHub Pages:** workflow جاهز في `.github/workflows/deploy-pages.yml`، ويحتاج تفعيل Pages من إعدادات المستودع.
+
+## Final release
+
+This repository contains the final Mujammadatco B2B frozen-food storefront and administration dashboard. The customer app is available at the repository root for GitHub Pages. Supabase remains the remote database and storage backend.
+
+Admin access: tap the top header logo three times within two seconds, then enter the configured admin PIN.

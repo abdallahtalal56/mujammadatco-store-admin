@@ -1,0 +1,19 @@
+{
+  "name": "مجمداتكو | مؤسسة المزرعاوي للمجمدات",
+  "short_name": "مجمداتكو",
+  "description": "كل احتياجاتك من المجمدات بمكان واحد",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1E6FA8",
+  "theme_color": "#1E6FA8",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "/manus-storage/icon-192_8bac3f15.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/manus-storage/icon-192_8bac3f15.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/manus-storage/icon-512_5a493858.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/manus-storage/icon-512_5a493858.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

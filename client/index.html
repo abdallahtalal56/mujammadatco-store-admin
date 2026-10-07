@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="مجمداتكو">
 <title>مجمداتكو | مؤسسة المزرعاوي للمجمدات</title>
 <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="assets/app-icon.svg">
-<link rel="icon" href="assets/app-icon.svg">
+<link rel="apple-touch-icon" href="/manus-storage/icon-192_8bac3f15.png">
+<link rel="icon" href="/manus-storage/icon-192_8bac3f15.png">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -176,7 +176,7 @@
 
 <!-- ===== Splash ===== -->
 <div id="splash">
-  <img src="assets/app-icon.svg" alt="مجمداتكو">
+  <img src="/manus-storage/icon-512_5a493858.png" alt="مجمداتكو">
   <div class="t1">مجمداتكو</div>
   <div class="t2">مؤسسة المزرعاوي للمجمدات</div>
   <div class="spinner"></div>
@@ -185,7 +185,7 @@
 <!-- ===== Welcome Gate ===== -->
 <div id="gate">
   <div class="box">
-    <img src="assets/app-icon.svg" alt="مجمداتكو">
+    <img src="/manus-storage/icon-512_5a493858.png" alt="مجمداتكو">
     <h1>أهلاً فيك بمجمداتكو</h1>
     <div class="gate-brandline">مؤسسة المزرعاوي للمجمدات</div>
     <p class="gate-note">كل احتياجاتك من المجمدات بمكان واحد</p>
@@ -196,7 +196,7 @@
 <!-- ===== Customer account gate ===== -->
 <div id="authGate">
   <div class="auth-card">
-    <div class="auth-head"><img src="assets/app-icon.svg" alt="مجمداتكو"><h2>بيانات العميل</h2><p>أدخل بياناتك مرة واحدة لتجهيز طلبك بسهولة</p></div>
+    <div class="auth-head"><img src="/manus-storage/icon-192_8bac3f15.png" alt="مجمداتكو"><h2>بيانات العميل</h2><p>أدخل بياناتك مرة واحدة لتجهيز طلبك بسهولة</p></div>
     <div class="auth-form"><input id="authName" placeholder="الاسم الكامل"><input id="authPhone" inputmode="tel" placeholder="رقم الهاتف"><input id="authAddress" placeholder="الموقع / عنوان التوصيل"><div id="authError" class="auth-error"></div><button class="auth-submit" onclick="saveCustomerDetails()">حفظ البيانات والدخول</button><button class="auth-skip" onclick="continueWithoutAccount()">المتابعة بدون حفظ</button></div>
   </div>
 </div>
@@ -213,7 +213,7 @@
   <header>
     <button id="backBtn" class="head-btn" onclick="goBack()">➔</button>
     <div class="brand" onclick="handleLogoTap()" style="cursor:pointer; user-select:none;">
-      <img src="assets/app-icon.svg" alt="مجمداتكو">
+      <img src="/manus-storage/icon-192_8bac3f15.png" alt="مجمداتكو">
       <div><div class="brand-txt">مجمداتكو</div><span class="brand-sub">مؤسسة المزرعاوي للمجمدات</span></div>
     </div>
     <button class="head-btn" onclick="openCart()">🛒<span class="cart-badge" id="cartCount" style="display:none;">0</span></button>
@@ -221,7 +221,7 @@
 
   <!-- ===== Screen: Categories ===== -->
   <div class="screen active" id="screenHome">
-    <div class="home-hero"><div class="hero-brandline"><img src="assets/app-icon.svg" alt="مجمداتكو"><span>مؤسسة المزرعاوي للمجمدات</span></div><h1>أهلاً بك في مجمداتكو</h1><p>كل احتياجات محلك من المجمدات بمكان واحد</p><div class="search-box">🔍<input id="searchInput" placeholder="ابحث عن الصنف أو المنتج أو الشركة" oninput="handleSearch(this.value)"></div></div>
+    <div class="home-hero"><div class="hero-brandline"><img src="/manus-storage/icon-192_8bac3f15.png" alt="مجمداتكو"><span>مؤسسة المزرعاوي للمجمدات</span></div><h1>أهلاً بك في مجمداتكو</h1><p>كل احتياجات محلك من المجمدات بمكان واحد</p><div class="search-box">🔍<input id="searchInput" placeholder="ابحث عن الصنف أو المنتج أو الشركة" oninput="handleSearch(this.value)"></div></div>
     <div class="home-title" id="homeTitle"><h2>احتياجات محلك</h2><span>اختر القسم وابدأ تجهيز طلبك</span></div><div class="cat-grid" id="catGrid"></div><div id="searchResults" class="items-grid" style="display:none;padding:0 14px 110px"></div>
   </div>
 
@@ -595,7 +595,7 @@ async function deleteProduct(id){
 async function showAdminProducts(){currentAdminTab='products';renderAdminPanel();}
 async function showAdminCategories(){
   currentAdminTab='categories'; const box=document.getElementById('adminContent'); if(!box)return;
-  box.innerHTML='<div style="color:#8aa0b4;font-weight:700;font-size:13px;margin-bottom:10px">🖼️ تعديل صور الأقسام</div>'+CATEGORIES.map(c=>`<div class="adm-row" style="display:block"><div style="color:#fff;font-weight:800;margin-bottom:7px">${c.emoji} ${c.name}</div><img src="${CATEGORY_IMAGES[c.key]||'assets/app-icon.svg'}" style="width:100%;height:90px;object-fit:cover;border-radius:10px;margin-bottom:7px"><input class="adm-input" type="file" accept="image/*" id="catFile-${c.key}"><button class="adm-btn" style="background:#7b4aa5;color:#fff;margin:0" onclick="saveCategoryImage('${c.key}')">💾 حفظ صورة القسم</button>${CATEGORY_IMAGES[c.key]?`<button class="adm-btn" style="background:#7a2222;color:#fff;margin:7px 0 0" onclick="deleteCategoryImage('${c.key}')">🗑️ حذف الصورة</button>`:''}</div>`).join('');
+  box.innerHTML='<div style="color:#8aa0b4;font-weight:700;font-size:13px;margin-bottom:10px">🖼️ تعديل صور الأقسام</div>'+CATEGORIES.map(c=>`<div class="adm-row" style="display:block"><div style="color:#fff;font-weight:800;margin-bottom:7px">${c.emoji} ${c.name}</div><img src="${CATEGORY_IMAGES[c.key]||'/manus-storage/icon-192_8bac3f15.png'}" style="width:100%;height:90px;object-fit:cover;border-radius:10px;margin-bottom:7px"><input class="adm-input" type="file" accept="image/*" id="catFile-${c.key}"><button class="adm-btn" style="background:#7b4aa5;color:#fff;margin:0" onclick="saveCategoryImage('${c.key}')">💾 حفظ صورة القسم</button>${CATEGORY_IMAGES[c.key]?`<button class="adm-btn" style="background:#7a2222;color:#fff;margin:7px 0 0" onclick="deleteCategoryImage('${c.key}')">🗑️ حذف الصورة</button>`:''}</div>`).join('');
 }
 async function saveCategoryImage(key){const f=document.getElementById('catFile-'+key)?.files[0];if(!f){alert('اختَر صورة أولاً');return;}const ext=(f.name.split('.').pop()||'jpg').toLowerCase(),path=`categories/${key}-${Date.now()}.${ext}`;const up=await supabaseClient.storage.from(PRODUCT_BUCKET).upload(path,f,{upsert:true,contentType:f.type||'image/jpeg'});if(up.error){alert('تعذّر رفع الصورة: '+up.error.message);return;}const url=supabaseClient.storage.from(PRODUCT_BUCKET).getPublicUrl(path).data.publicUrl;const r=await supabaseClient.rpc('admin_upsert_category_image',{p_pin:ADMIN_RPC_PIN,p_category_key:key,p_image_url:url});if(r.error){alert('تعذّر حفظ الصورة: '+r.error.message);return;}await loadCategoryImages();renderHome();showAdminCategories();alert('تم تحديث صورة القسم ✓');}
 async function deleteCategoryImage(key){if(!confirm('حذف صورة هذا القسم؟'))return;const r=await supabaseClient.rpc('admin_delete_category_image',{p_pin:ADMIN_RPC_PIN,p_category_key:key});if(r.error||r.data!==true){alert('تعذّر حذف الصورة');return;}delete CATEGORY_IMAGES[key];renderHome();showAdminCategories();}
