@@ -1,12 +1,14 @@
 package com.mujammadatco.store;
 
 import android.app.Activity;
+import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.window.OnBackInvokedDispatcher;
 
 public class MainActivity extends Activity {
     private static final String LIVE_URL = "https://mujadmin-qjnkrpcc.manus.space/";
@@ -32,7 +34,6 @@ public class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return false;
             }
-
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame() && !triedLocalFallback) {
                     triedLocalFallback = true;
@@ -42,9 +43,37 @@ public class MainActivity extends Activity {
         });
         webView.loadUrl(LIVE_URL);
         setContentView(webView);
+
+        // Android 13+ hardware and gesture back support.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    this::handleBackPress
+            );
+        }
     }
 
+    private void handleBackPress() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            finish();
+        }
+    }
+
+    // Android 12 and older hardware back support.
     @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            handleBackPress();
+        }
+    }
+
+    @Override protected void onDestroy() {
+        if (webView != null) {
+            webView.stopLoading();
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
     }
 }
